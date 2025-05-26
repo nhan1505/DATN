@@ -1,47 +1,67 @@
-<!DOCTYPE html>
-<html lang="en">
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dự đoán bảo hiểm y tế</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h2 class="mt-5 text-center">Dự đoán số tiền bảo hiểm y tế</h2>
-        <form method="POST" action="/predict" class="mt-4">
-            <div class="form-group">
-                <label>Tuổi:</label>
-                <input type="number" class="form-control" name="age" min="0" required>
-            </div>
-            <div class="form-group">
-                <label>Giới tính (0: Nam, 1: Nữ):</label>
-                <input type="number" class="form-control" name="sex" min="0" max="1" required>
-            </div>
-            <div class="form-group">
-                <label>Chiều cao (cm):</label>
-                <input type="number" step="0.1" class="form-control" name="height" min="0" required>
-            </div>
-            <div class="form-group">
-                <label>Cân nặng (kg):</label>
-                <input type="number" step="0.1" class="form-control" name="weight" min="0" required>
-            </div>
-            <div class="form-group">
-                <label>Hút thuốc (0: Không, 1: Có):</label>
-                <input type="number" class="form-control" name="smoker" min="0" max="1" required>
-            </div>
-            <div class="form-group">
-                <label>Khu vực (0: Tây Nam, 1: Đông Nam, 2: Tây Bắc, 3: Đông Bắc):</label>
-                <input type="number" class="form-control" name="region" min="0" max="3" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block">Dự đoán</button>
-        </form>
-        {% if prediction_text %}
-            <div class="alert alert-success mt-3 text-center">
-                <h3>{{ prediction_text }}</h3>
-            </div>
-        {% endif %}
-    </div>
+    <h1>Dự đoán số tiền bảo hiểm y tế</h1>
+    <form method="POST" action="/predict">
+        <label>Tuổi:</label><input type="number" name="age" required><br>
+        <label>Giới tính (0: Nam, 1: Nữ):</label><input type="number" name="sex" min="0" max="1" required><br>
+        <label>BMI:</label><input type="number" step="0.1" name="bmi" required><br>
+        <label>Hút thuốc (0: Không, 1: Có):</label><input type="number" name="smoker" min="0" max="1" required><br>
+        <label>Khu vực (0: southwest, 1: southeast, 2: northwest, 3: northeast):</label>
+        <input type="number" name="region" min="0" max="3" required><br>
+        <label>Chọn mô hình:</label>
+        <select name="model" required>
+            <option value="random_forest">Random Forest</option>
+            <option value="decision_tree">Decision Tree</option>
+        </select><br>
+        <button type="submit">Dự đoán</button>
+    </form>
+    {% if prediction_text %}
+        <h2>{{ prediction_text }}</h2>
+    {% endif %}
 </body>
 </html>
