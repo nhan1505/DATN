@@ -1,1 +1,3 @@
 pip install pandas numpy scikit-learn joblib
+python train_decision_tree.py
+python train_random_forest.py
